@@ -1,0 +1,3 @@
+func mul(num: int) -> int {
+    return num
+}

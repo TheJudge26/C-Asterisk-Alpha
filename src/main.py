@@ -44,6 +44,7 @@ def _try_load_lib_io():
 
 
 def main():
+    print("debug started")
     if len(sys.argv) < 2:
         print("Usage: cstar <file.cstar>     (Run instantly via JIT)")
         print("       cstar -b <file.cstar>  (Build executable via AOT)")
@@ -167,3 +168,5 @@ def main():
 
     print("Success! (Pipeline is completely wired up)")
 
+if __name__ == "__main__":
+    main()

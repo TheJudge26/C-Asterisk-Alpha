@@ -152,12 +152,12 @@ PRECEDENCE = {
 
 # parser
 class Parser:
-    def __init__(self, tokens):
+    def __init__(self, tokens, visited_files=None):
         self.tokens = tokens
         self.pos = 0
         self.current = tokens[self.pos]
         self.errors = []
-
+        self.visited_files=visited_files if visited_files is not None else set()
     def advance(self):
         self.pos += 1
         self.current = self.tokens[self.pos] if self.pos < len(self.tokens) else self.tokens[-1]
@@ -191,16 +191,17 @@ class Parser:
     def parse(self):
         statements = []
         while self.current.type != TokenType.EOF:
-         try:
+            try:
                 stmt = self.statement()
                 if stmt:
-                    statements.append(stmt)
-         except ParserError as e:
-                
+                    if isinstance(stmt, list):
+                        statements.extend(stmt) # Flatten out the imported statement list
+                    else:
+                        statements.append(stmt)
+            except ParserError as e:
                 self.errors.append(str(e))
                 self.synchronize()
         return Program(statements)
-
     
     # statements
     def statement(self):
@@ -323,9 +324,44 @@ class Parser:
 
     def import_stmt(self):
         self.eat(TokenType.IMPORT)
-        module = self.current.value
+        module_name = self.current.value
         self.eat(TokenType.IDENTIFIER)
-        return Import(module)
+        
+        import os
+        target_filename = f"{module_name}.cstar"
+        
+        # Look for files relative to the current file directory if tracking paths, 
+        # or fallback to local lookups safely.
+        abs_path = os.path.abspath(target_filename)
+        if not os.path.exists(abs_path):
+            # Fallback path check inside an examples subdirectory
+            fallback_path = os.path.abspath(os.path.join("examples", target_filename))
+            if os.path.exists(fallback_path):
+                abs_path = fallback_path
+
+        if abs_path in self.visited_files:
+            return None
+        self.visited_files.add(abs_path)
+        
+        try:
+            with open(abs_path, 'r') as f:
+                source_code = f.read()
+        except FileNotFoundError:
+            raise ParserError(
+                f"Could not find imported file: '{target_filename}'", 
+                self.current.line, 
+                self.current.column
+            )
+            
+        from lexer import Lexer 
+        
+        sub_lexer = Lexer(source_code)
+        sub_tokens = sub_lexer.tokenize()
+        
+        sub_parser = Parser(sub_tokens, visited_files=self.visited_files)
+        imported_program_ast = sub_parser.parse()
+        
+        return imported_program_ast.statements
 
     # BLOCK
     

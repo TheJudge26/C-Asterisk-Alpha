@@ -1,1 +1,3 @@
-print("Hello \"W\"orld")
+import portme
+let x: int = mul(4)
+print(x)
